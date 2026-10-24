@@ -512,39 +512,44 @@ function partSpec(v) {
   box.addEventListener('toggle', () => { if (box.open) openSpecs.add(v.uuid); else openSpecs.delete(v.uuid); });
   if (!hw) { body.append(el('div', { className: 'empty', textContent: '(無法取得規格)' })); return box; }
   const stopped = v.status === 'stopped';
-  const maxCpu = HOST.cpus || Math.max(hw.cpus, 1), maxMem = Math.max(Math.floor((HOST.memMB || hw.memMB) / 256) * 256, hw.memMB);
+  const maxCpu = HOST.cpus || Math.max(hw.cpus, 1), maxMem = Math.max(Math.floor((HOST.memMB || hw.memMB) / 1024) * 1024, hw.memMB);
   const tickLeft = f => `calc(${f} * (100% - 18px) + 9px)`;
-  const mk = (label, min, max, step, val, fmt, unit) => {
-    const out = el('b', { textContent: fmt(val) });
-    const sl = el('input', { type: 'range', className: 'form-slider', min, max, step, value: val, disabled: !stopped });
-    const fill = el('div', { className: 'slider-fill' });
-    const wrap = el('div', { className: 'slider-wrap' }, fill, sl);
-    const upd = () => wrap.style.setProperty('--sl-stop', `calc(${(sl.value - min) / (max - min)} * (100% - 18px) + 9px)`);
-    sl.addEventListener('input', () => { out.textContent = fmt(+sl.value); upd(); sync(); });
-    upd();
-    // 刻度:最左是最小值,之後每個整數單位一個點,最右是上限;數字最多標 7 個且等距
-    // (間隔取能整除的最小值,讓最右邊的上限一定有數字)
-    const ticks = el('div', { className: 'slider-ticklabels' + (stopped ? '' : ' dim') });
+  // 滑桿只會停在「停靠點」:最小值,之後每個整數單位(核心數 / GB),最後是上限。
+  // 滑桿本身以停靠點的序號(0..n)運作,所以不可能停在非整數的位置;
+  // 機器目前的值若不在停靠點上(例如 3.5 GB),補一個停靠點,避免一打開就被改掉。
+  const mk = (label, min, max, cur, fmt, unit) => {
     const vals = [min];
     for (let k = Math.floor(min / unit) + 1; k * unit <= max; k++) vals.push(k * unit);
     if (vals[vals.length - 1] !== max) vals.push(max);
+    if (!vals.includes(cur)) { vals.push(cur); vals.sort((x, y) => x - y); }
     const n1 = vals.length - 1;
+    const out = el('b', { textContent: fmt(cur) });
+    const sl = el('input', { type: 'range', className: 'form-slider', min: 0, max: n1, step: 1, value: vals.indexOf(cur), disabled: !stopped });
+    const fill = el('div', { className: 'slider-fill' });
+    const wrap = el('div', { className: 'slider-wrap' }, fill, sl);
+    const upd = () => wrap.style.setProperty('--sl-stop', `calc(${sl.value / n1} * (100% - 18px) + 9px)`);
+    const res = { sl, get value() { return vals[+sl.value]; } };
+    sl.addEventListener('input', () => { out.textContent = fmt(res.value); upd(); sync(); });
+    upd();
+    // 數字最多標 7 個且等距(間隔取能整除的最小值,讓最右邊的上限一定有數字)
+    const ticks = el('div', { className: 'slider-ticklabels' + (stopped ? '' : ' dim') });
     let gap = 1; while (n1 / gap + 1 > 7 && gap < n1) gap++;
     while (n1 % gap !== 0 && gap < n1) gap++;
     if (gap === n1 && n1 > 6) gap = Math.ceil(n1 / 6);   // 沒有適合的整除間隔:退而求其次,最後一個一定標數字
     vals.forEach((t, i) => {
       const labeled = i === n1 || (i % gap === 0 && n1 - i >= gap / 2);   // 倒數第二個標籤太貼近上限就略過
-      ticks.append(el('span', { textContent: labeled ? String(+(t / unit).toFixed(2)) : '', style: 'left:' + tickLeft((t - min) / (max - min)) }));
+      ticks.append(el('span', { textContent: labeled ? String(+(t / unit).toFixed(2)) : '', style: 'left:' + tickLeft(i / n1) }));
     });
-    return { sl, node: el('div', { className: 'spec-row' }, el('div', { className: 'spec-label' }, el('span', { textContent: label }), out), wrap, ticks) };
+    res.node = el('div', { className: 'spec-row' }, el('div', { className: 'spec-label' }, el('span', { textContent: label }), out), wrap, ticks);
+    return res;
   };
-  const cpu = mk('CPU 核心數', 1, maxCpu, 1, hw.cpus, x => x + ' 核', 1);
-  const mem = mk('記憶體(刻度單位:GB)', 512, maxMem, 256, hw.memMB, fmtMem, 1024);
+  const cpu = mk('CPU 核心數', 1, maxCpu, hw.cpus, x => x + ' 核', 1);
+  const mem = mk('記憶體(刻度單位:GB)', 512, maxMem, hw.memMB, fmtMem, 1024);
   const apply = btn('套用', async () => {
-    await api('POST', `vm/${v.uuid}/spec`, { cpus: +cpu.sl.value, memMB: +mem.sl.value });
+    await api('POST', `vm/${v.uuid}/spec`, { cpus: cpu.value, memMB: mem.value });
     msg('已更新「' + v.name + '」的規格');
   }, 'small primary');
-  const sync = () => { apply.disabled = !stopped || (+cpu.sl.value === hw.cpus && +mem.sl.value === hw.memMB); };
+  const sync = () => { apply.disabled = !stopped || (cpu.value === hw.cpus && mem.value === hw.memMB); };
   sync();
   body.append(cpu.node, mem.node);
   body.append(stopped ? el('div', { className: 'spec-actions' }, apply)
