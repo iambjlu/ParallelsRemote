@@ -120,12 +120,10 @@ details.card > .vm-body { margin-top: 0; }
 .form-slider:disabled { cursor: not-allowed; }
 .form-slider:disabled::-webkit-slider-thumb { background: rgba(128,128,128,0.3); box-shadow: none; border: none; }
 /* 刻度:位置公式與 .slider-fill 的停止點一致,數字才會對準把手實際停留處 */
-.slider-ticklabels { position: relative; z-index: 1; height: 14px; margin: 14px 0 6px; font-size: 10px; color: var(--muted); pointer-events: none; }
+.slider-ticklabels { position: relative; height: 14px; margin: 18px 0 6px; font-size: 10px; color: var(--muted); pointer-events: none; }
 .slider-ticklabels span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
-/* 刻度點嵌在軌道上(軌道中心在數字列上方 18px):每個停靠點一個小點,標了數字的點較大較亮 */
-.slider-ticklabels span::before { content: ''; position: absolute; left: 50%; top: -20px; width: 4px; height: 4px; border-radius: 50%;
-  background: rgba(255,255,255,0.5); transform: translateX(-50%); }
-.slider-ticklabels span.lb::before { top: -21px; width: 6px; height: 6px; background: rgba(255,255,255,0.9); }
+.slider-ticklabels span::before { content: ''; position: absolute; left: 50%; top: -7px; width: 1px; height: 4px;
+  background: rgba(255,255,255,0.28); transform: translateX(-50%); }
 .slider-ticklabels.dim { opacity: .35; }
 .spec-actions { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
 .empty { font-size: 12px; color: var(--muted); padding: 2px 0 6px; }
@@ -533,14 +531,15 @@ function partSpec(v) {
     const res = { sl, get value() { return vals[+sl.value]; } };
     sl.addEventListener('input', () => { out.textContent = fmt(res.value); upd(); sync(); });
     upd();
-    // 數字最多標 7 個且等距(間隔取能整除的最小值,讓最右邊的上限一定有數字)
+    // 刻度只標在:最小值、之後的偶數(2、4、6…,標籤超過 9 個時間隔加倍)、以及上限(離最後一個標籤夠遠才標)
     const ticks = el('div', { className: 'slider-ticklabels' + (stopped ? '' : ' dim') });
-    let gap = 1; while (n1 / gap + 1 > 7 && gap < n1) gap++;
-    while (n1 % gap !== 0 && gap < n1) gap++;
-    if (gap === n1 && n1 > 6) gap = Math.ceil(n1 / 6);   // 沒有適合的整除間隔:退而求其次,最後一個一定標數字
+    let st = 2; while ((max - min) / unit / st + 1 > 9 && st < 1024) st *= 2;
+    const marks = new Set([min]);
+    for (let k = st; k * unit <= max; k += st) if (k * unit > min) marks.add(k * unit);
+    const last = Math.max(...marks);
+    if (max !== last && (max - last) / unit >= st / 2) marks.add(max);
     vals.forEach((t, i) => {
-      const labeled = i === n1 || (i % gap === 0 && n1 - i >= gap / 2);   // 倒數第二個標籤太貼近上限就略過
-      ticks.append(el('span', { className: labeled ? 'lb' : '', textContent: labeled ? String(+(t / unit).toFixed(2)) : '', style: 'left:' + tickLeft(i / n1) }));
+      if (marks.has(t)) ticks.append(el('span', { textContent: String(+(t / unit).toFixed(2)), style: 'left:' + tickLeft(i / n1) }));
     });
     res.node = el('div', { className: 'spec-row' }, el('div', { className: 'spec-label' }, el('span', { textContent: label }), out), wrap, ticks);
     return res;
