@@ -100,14 +100,31 @@ details.card > .vm-body { margin-top: 0; }
 .spec-row { margin-top: 10px; }
 .spec-label { display: flex; justify-content: space-between; font-size: 13px; }
 .spec-label b { color: var(--accent); font-weight: 600; }
-.form-slider { display: block; width: 100%; -webkit-appearance: none; appearance: none; height: 8px; margin: 12px 0 6px;
-  border-radius: 9999px; outline: none; cursor: pointer; padding: 0; border: none;
-  background: linear-gradient(to right, var(--accent) var(--pct, 0%), rgba(128,128,128,0.25) var(--pct, 0%)); }
+.slider-wrap { position: relative; display: block; width: 100%; margin: 14px 0 4px; }
+.slider-wrap::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 8px; border-radius: 9999px;
+  background: rgba(128,128,128,0.18); box-shadow: inset 0 1px 2px rgba(0,0,0,0.18); pointer-events: none; }
+/* 金色填充:兩端全圓角,右端是半圓結尾;停止點對齊把手中心(把手寬 18px) */
+.slider-fill { position: absolute; left: 0; top: -1px; height: 10px; width: var(--sl-stop, 9px); border-radius: 9999px;
+  background: var(--accent); box-shadow: 0 2px 5px rgba(0,0,0,0.35); z-index: 1; pointer-events: none; }
+.slider-wrap:has(.form-slider:disabled) .slider-fill { background: rgba(128,128,128,0.45); box-shadow: none; }
+.form-slider { display: block; width: 100%; -webkit-appearance: none; appearance: none; height: 8px; margin: 0;
+  border-radius: 9999px; outline: none; cursor: pointer; padding: 0; border: none; background: transparent; position: relative; z-index: 2; }
 .form-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 30px; border-radius: 9px; cursor: pointer;
-  background: linear-gradient(135deg, rgba(255,255,255,0.75) 0%, rgba(228,228,228,0.55) 100%);
-  border: 0.5px solid rgba(255,255,255,0.6); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
-.form-slider:disabled { opacity: .35; cursor: not-allowed; }
-.spec-ticks { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); }
+  background: linear-gradient(135deg, rgba(255,255,255,0.40) 0%, rgba(228,228,228,0.24) 100%);
+  border: 0.5px solid rgba(255,255,255,0.46);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.16), 0 0 0 0.5px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.40), 0 0 8px rgba(255,215,0,0.18);
+  transition: transform .1s, box-shadow .45s, background .45s; }
+.form-slider:not(:disabled)::-webkit-slider-thumb:active { transform: scale(1.12);
+  background: linear-gradient(135deg, rgba(255,255,255,0.92) 0%, rgba(245,245,245,0.72) 100%); border-color: rgba(255,255,255,0.85);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.24), 0 0 14px rgba(255,215,0,0.42); transition: transform .1s, background .06s; }
+.form-slider:disabled { cursor: not-allowed; }
+.form-slider:disabled::-webkit-slider-thumb { background: rgba(128,128,128,0.3); box-shadow: none; border: none; }
+/* 刻度:位置公式與 .slider-fill 的停止點一致,數字才會對準把手實際停留處 */
+.slider-ticklabels { position: relative; height: 14px; margin: 18px 0 6px; font-size: 10px; color: var(--muted); pointer-events: none; }
+.slider-ticklabels span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+.slider-ticklabels span::before { content: ''; position: absolute; left: 50%; top: -7px; width: 1px; height: 4px;
+  background: rgba(255,255,255,0.28); transform: translateX(-50%); }
+.slider-ticklabels.dim { opacity: .35; }
 .spec-actions { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
 .empty { font-size: 12px; color: var(--muted); padding: 2px 0 6px; }
 .row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
@@ -496,14 +513,22 @@ function partSpec(v) {
   if (!hw) { body.append(el('div', { className: 'empty', textContent: '(無法取得規格)' })); return box; }
   const stopped = v.status === 'stopped';
   const maxCpu = HOST.cpus || Math.max(hw.cpus, 1), maxMem = Math.max(Math.floor((HOST.memMB || hw.memMB) / 256) * 256, hw.memMB);
+  const tickLeft = f => `calc(${f} * (100% - 18px) + 9px)`;
   const mk = (label, min, max, step, val, fmt) => {
     const out = el('b', { textContent: fmt(val) });
     const sl = el('input', { type: 'range', className: 'form-slider', min, max, step, value: val, disabled: !stopped });
-    const fill = () => sl.style.setProperty('--pct', ((sl.value - min) / (max - min) * 100) + '%');
-    sl.addEventListener('input', () => { out.textContent = fmt(+sl.value); fill(); sync(); });
-    fill();
-    return { sl, node: el('div', { className: 'spec-row' }, el('div', { className: 'spec-label' }, el('span', { textContent: label }), out), sl,
-      el('div', { className: 'spec-ticks' }, el('span', { textContent: fmt(min) }), el('span', { textContent: fmt(max) }))) };
+    const fill = el('div', { className: 'slider-fill' });
+    const wrap = el('div', { className: 'slider-wrap' }, fill, sl);
+    const upd = () => wrap.style.setProperty('--sl-stop', `calc(${(sl.value - min) / (max - min)} * (100% - 18px) + 9px)`);
+    sl.addEventListener('input', () => { out.textContent = fmt(+sl.value); upd(); sync(); });
+    upd();
+    // 5 段等分刻度(min..max),刻度值取到 step 的倍數
+    const ticks = el('div', { className: 'slider-ticklabels' + (stopped ? '' : ' dim') });
+    for (let i = 0; i <= 4; i++) {
+      const raw = min + (max - min) * i / 4, t = i === 4 ? max : Math.round(raw / step) * step;
+      ticks.append(el('span', { textContent: fmt(t), style: 'left:' + tickLeft((t - min) / (max - min)) }));
+    }
+    return { sl, node: el('div', { className: 'spec-row' }, el('div', { className: 'spec-label' }, el('span', { textContent: label }), out), wrap, ticks) };
   };
   const cpu = mk('CPU 核心數', 1, maxCpu, 1, hw.cpus, x => x + ' 核');
   const mem = mk('記憶體', 512, maxMem, 256, hw.memMB, fmtMem);
