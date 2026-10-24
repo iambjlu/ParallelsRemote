@@ -147,7 +147,7 @@ final class AppState: ObservableObject {
     }
 
     /// 各網路介面的 IPv4:回傳 (顯示名稱, IP)。
-    /// 顯示名稱沿用 DragonVM 的做法,用 SCNetworkInterface 把 en0 換成系統上的名稱(例如 Wi-Fi);
+    /// 顯示名稱沿用 範本專案 的做法,用 SCNetworkInterface 把 en0 換成系統上的名稱(例如 Wi-Fi);
     /// 沒有系統名稱的 VPN 通道(utun)若在 Tailscale 位址範圍就標成 Tailscale,否則保留原名。
     /// 排除 loopback、link-local 與虛擬機內部網路(gif / vmnet / bridge)。
     static func localIPv4() -> [(String, String)] {

@@ -1,4 +1,4 @@
-// 單頁網頁 UI。配色與排版參考 DragonVM 的冷灰 + 琥珀金風格,
+// 單頁網頁 UI。配色與排版參考冷灰 + 琥珀金風格,
 // 但為了節省手機 GPU,不使用 backdrop-filter(毛玻璃模糊)、光暈陰影與動畫。
 let webPage = #"""
 <!doctype html>
@@ -95,7 +95,7 @@ details.card > .vm-body { margin-top: 0; }
 .sub { margin-top: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
 .sub-title { font-size: 13px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
 .sub-title small { font-weight: 400; color: var(--muted); font-size: 11px; }
-/* 規格滑桿(CPU / 記憶體),樣式參考 DragonGuardian 的 .form-slider:金色填充、橢圓玻璃把手 */
+/* 規格滑桿(CPU / 記憶體),樣式參考 範本專案 的 .form-slider:金色填充、橢圓玻璃把手 */
 .spec-line { font-weight: 400; font-size: 12px; color: var(--muted); }
 .spec-row { margin-top: 10px; }
 .spec-label { display: flex; justify-content: space-between; font-size: 13px; }
@@ -155,7 +155,7 @@ form.fw select { padding: 0 6px; }
 select option { background: var(--surface); color: var(--text); }
 select:focus, input:focus { border-color: var(--accent); }
 
-/* 網頁內對話框(取代 alert/confirm/prompt);比照 Dragon 的堆疊式全寬按鈕,不使用模糊 */
+/* 網頁內對話框(取代 alert/confirm/prompt);比照 範本專案 的堆疊式全寬按鈕,不使用模糊 */
 #dg-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
   padding: 24px; background: rgba(0,0,0,0.6); }
 .dg-dialog { width: min(420px, 100%); max-height: calc(100vh - 48px); overflow-y: auto; background: var(--bg);
@@ -314,7 +314,7 @@ function el(tag, props, ...kids) {
   for (const k of kids) e.append(k);
   return e;
 }
-// Material 圖示路徑(沿用 Dragon 專案的圖示選擇)
+// Material 圖示路徑(沿用 範本專案 專案的圖示選擇)
 const ICONS = {
   start: 'M8 5v14l11-7z',                                               // play_arrow:開機 / 恢復
   pause: 'M6 19h4V5H6v14zm8-14v14h4V5h-4z',                             // pause:暫停
