@@ -79,8 +79,7 @@ struct Router: Sendable {
                  "target": f.target, "destPort": f.destPort, "managed": f.managed]
             }
             return .json(["vms": try await vms, "forwards": forwards,
-                          "host": ["cpus": Parallels.hostCPUs, "memMB": Parallels.hostMemMB,
-                           "tailscale": Parallels.tailscaleIPv4() as Any? ?? NSNull()]])
+                          "host": ["cpus": Parallels.hostCPUs, "memMB": Parallels.hostMemMB]])
         }
 
         if p.count == 2, p[0] == "vm", m == "DELETE" {

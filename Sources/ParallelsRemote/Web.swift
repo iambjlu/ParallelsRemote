@@ -455,33 +455,16 @@ function snapSection(vm) {
 }
 
 // ───────── 每張卡片拆成幾個區塊,各自用「內容特徵」判斷要不要重畫 ─────────
-// 卡片標題旁的按鈕:拷貝這台 Mac 的 Tailscale IP(虛擬機本身不在 Tailscale 內)。標題列是 <summary>,所以要擋掉展開 / 收合
-function tsBtn() {
-  if (!HOST.tailscale) return '';
-  const ip = HOST.tailscale;
-  const b = el('button', { type: 'button', className: 'btn small icon', title: '拷貝 Tailscale IP ' + ip,
-    onclick: ev => { ev.preventDefault(); ev.stopPropagation(); copyText(ip); } });
-  b.setAttribute('aria-label', '拷貝 Tailscale IP ' + ip);
-  b.innerHTML = COPY_SVG;
-  return b;
-}
 function partHead(v) {
   return el('div', { className: 'vm-head' }, el('span', { className: 'dot ' + v.status }),
-    el('span', { className: 'vm-name', textContent: v.name }), tsBtn(), caret());
+    el('span', { className: 'vm-name', textContent: v.name }), caret());
 }
-function partIps(v, mine) {
+function partIps(v) {
   // v.ips: [{ip, net}];停止中的機器沒有 IP
   const ips = (v.ips && v.ips.length) ? v.ips : (v.ip_configured && v.ip_configured !== '-' ? [{ ip: v.ip_configured, net: '' }] : []);
   const ipRow = el('div', { className: 'ips' });
   ipRow.append(el('div', { className: 'ip-row' }, el('span', { className: 'net', textContent: '狀態' }), el('span', { className: 'chip ' + v.status, textContent: STATUS[v.status] || v.status })));
-  // 這台機器有端口轉發時,顯示「目前連線用的位址:Mac 埠」(例如用 100.x 或 192.168.x 開網頁就是同一個 IP);
-  // 虛擬機自己的內部 IP 從外部連不到,沒有轉發時才顯示。
-  if (mine && mine.length) for (const f of mine) {
-    const addr = location.hostname + ':' + f.sourcePort;
-    ipRow.append(el('div', { className: 'ip-row' },
-      el('span', { className: 'net', textContent: f.proto + ' → ' + f.destPort }), el('span', { className: 'ip', textContent: addr, title: '點一下拷貝', onclick: () => copyText(addr) })));
-  }
-  else if (ips.length) for (const i of ips) ipRow.append(el('div', { className: 'ip-row' },
+  if (ips.length) for (const i of ips) ipRow.append(el('div', { className: 'ip-row' },
     el('span', { className: 'net', textContent: i.net || 'IP' }), el('span', { className: 'ip', textContent: i.ip, title: '點一下拷貝', onclick: () => copyText(i.ip) })));
   else ipRow.append(el('div', { className: 'ip-row' }, el('span', { className: 'net', textContent: 'IP' }), el('span', { textContent: '—' })));
   return ipRow;
@@ -601,8 +584,8 @@ const BUILD = { head: partHead, ips: partIps, actions: partActions, spec: partSp
 function partSigs(v, forwards) {
   const mine = forwards.filter(f => norm(f.target) === norm(v.uuid));
   return { mine, sig: {
-    head: v.name + '|' + v.status + '|' + (HOST.tailscale || ''),
-    ips: v.status + '|' + JSON.stringify(v.ips || null) + '|' + v.ip_configured + '|' + JSON.stringify(mine) + '|' + location.hostname,
+    head: v.name + '|' + v.status,
+    ips: v.status + '|' + JSON.stringify(v.ips || null) + '|' + v.ip_configured,
     actions: v.status + '|' + v.name + '|' + v.uuid,
     spec: v.status + '|' + JSON.stringify(v.hw || null) + '|' + HOST.cpus + '|' + HOST.memMB,
     nics: v.status + '|' + v.name + '|' + JSON.stringify(v.nics || null),

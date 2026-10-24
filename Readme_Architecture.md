@@ -89,7 +89,7 @@ Cookie 屬性:`HttpOnly`(網頁 JS 讀不到)、`SameSite=Strict`、`Path=/`、`
 | GET | `/api/session` | `{authRequired, authed}` |
 | POST | `/api/login` | `{password}`;成功設定 Cookie |
 | POST | `/api/logout` | 作廢目前 session |
-| GET | `/api/state` | `{vms, forwards, host}`:機器清單(含 `ips`、`nics`、`hw`)、端口轉發與主機上限與 Tailscale IP(`host.cpus`、`host.memMB`、`host.tailscale`,沒有 Tailscale 時為 null) |
+| GET | `/api/state` | `{vms, forwards, host}`:機器清單(含 `ips`、`nics`、`hw`)、端口轉發與主機上限(`host.cpus`、`host.memMB`) |
 | POST | `/api/vm/:id/spec` | `{cpus, memMB}`,修改 CPU 與記憶體;機器必須是關機狀態 |
 | POST | `/api/vm/:id/{start,stop,kill,suspend,resume,pause,restart}` | 電源操作 |
 | POST | `/api/vm/:id/clone` | `{name?, start?}`,APFS 複製 |
@@ -125,8 +125,6 @@ Cookie 屬性:`HttpOnly`(網頁 JS 讀不到)、`SameSite=Strict`、`Path=/`、`
 | 刪除 | `prlctl stop --kill`(若在執行)→ `prlctl delete` |
 
 ### 重要行為
-
-- **Tailscale IP**:`tailscaleIPv4()` 以 `getifaddrs` 找已啟用網卡上落在 `100.64.0.0/10` 的 IPv4,供網頁的拷貝按鈕使用。
 
 - **規格(CPU / 記憶體)**:`listVMs` 對所有狀態的機器都查 `list -i`,把 `cpus` 與 `memMB` 放進 `hw`(IP 與網卡仍只處理執行中的機器)。`setSpec` 驗證 CPU 介於 1 到主機核心數、記憶體介於 256MB 到主機實體記憶體,並要求機器為 `stopped`(Parallels 不允許修改執行中 / 休眠機器的硬體),否則回 `409`。
 
@@ -174,7 +172,7 @@ iOS 加到主畫面時使用 `apple-touch-icon`(滿版 180x180),而且圖示是�
 
 整個前端是一個字串常數,由 `GET /` 回傳。外觀參考 範本專案 的冷灰 + 琥珀金配色,為節省手機 GPU 不使用 `backdrop-filter`、光暈陰影與動畫。字型使用系統字型並以非阻塞方式載入 Google Fonts 的 Inter(外網不通時頁面也不會卡住)。
 
-- **版面**:每台機器一張卡片,預設只顯示狀態圓點與名稱,以及一顆拷貝這台 Mac 的 Tailscale IP 的按鈕(有偵測到 Tailscale 才出現,點擊不會展開卡片);展開後依序為狀態與 IP(該機器有端口轉發時,改顯示「目前連線網址的主機名稱:Mac 埠」,例如用哪個 IP 開網頁就顯示那個 IP,點一下拷貝;沒有轉發時才顯示虛擬機自己的 IP)、電源按鈕列、規格、網卡、端口轉發、快照。電源按鈕列使用圖示,紅色(危險)按鈕 —— 強制關機、刪除 —— 固定排在最右邊(第一個以 `margin-left: auto` 推到右側),與一般按鈕分開。
+- **版面**:每台機器一張卡片,預設只顯示狀態圓點與名稱;展開後依序為狀態與 IP、電源按鈕列、規格、網卡、端口轉發、快照。電源按鈕列使用圖示,紅色(危險)按鈕 —— 強制關機、刪除 —— 固定排在最右邊(第一個以 `margin-left: auto` 推到右側),與一般按鈕分開。
 - **規格區塊**(`partSpec`):預設收合的 `details`(展開狀態記在 `openSpecs`,區塊重畫時保留),標題列顯示「N 核心 · X GB」,展開後提供 CPU(1 到主機核心數)與記憶體(512MB 到主機記憶體取整數 GB)兩條滑桿。滑桿以「停靠點序號」運作:停靠點是最小值、之後每個整數單位、最後是上限,所以只會停在整數(下限 0.5 GB 除外);機器目前的值若不在停靠點上會補一個停靠點,樣式參考 範本專案 的 `.form-slider`:灰色軌道(`.slider-wrap::before`)上疊獨立的金色填充 `.slider-fill`(兩端全圓角,右端為半圓結尾,停止點對齊把手中心 `calc(比例 * (100% - 18px) + 9px)`)、橢圓玻璃把手,以及刻度與數字(`.slider-ticklabels`):只在最小值(1 核 / 0.5 GB)、偶數(2、4、6…)與上限標小刻度線和數字,例如 10 核為 1、2、4、6、8、10,16GB 為 0.5、2、4…16;標籤超過 9 個時間隔加倍;上限若離最後一個標籤太近就不標。位置與填充使用相同的公式,所以數字對準把手停留處。
 - **差異更新**:每張卡片拆成 `head / ips / actions / spec / nics / fw` 區塊,各自計算內容特徵(`partSigs`);刷新時只替換特徵有變的區塊,沒變的 DOM 節點完全不動,因此展開狀態、輸入到一半的欄位、捲動位置都會保留。卡片以 UUID 為鍵,新增 / 移除 / 排序只動有差異的節點。快照清單在展開時靜默重抓,內容沒變就不替換。
 - **刷新時機**:頁面載入、操作完成後,以及點擊畫面任何位置(0.4 秒內連點只刷新一次)。同時只跑一個刷新,刷新途中又被要求時在結束後補跑一次。
