@@ -41,7 +41,7 @@ body {
 header {
   position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px;
   /* PWA 全螢幕時內容會延伸到狀態列 / 動態島底下,標題列要自己留出安全區域 */
-  padding: calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left));
+  padding: calc(22px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left));
   background: var(--surface); border-bottom: 1px solid var(--border);
 }
 header { gap: 8px; }
