@@ -545,7 +545,7 @@ function partSpec(v) {
     return res;
   };
   const cpu = mk('CPU 核心數', 1, maxCpu, hw.cpus, x => x + ' 核', 1);
-  const mem = mk('記憶體(刻度單位:GB)', 512, maxMem, hw.memMB, fmtMem, 1024);
+  const mem = mk('記憶體', 512, maxMem, hw.memMB, fmtMem, 1024);
   const apply = btn('套用', async () => {
     await api('POST', `vm/${v.uuid}/spec`, { cpus: cpu.value, memMB: mem.value });
     msg('已更新「' + v.name + '」的規格');
