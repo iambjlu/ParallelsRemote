@@ -514,7 +514,7 @@ function partSpec(v) {
   const stopped = v.status === 'stopped';
   const maxCpu = HOST.cpus || Math.max(hw.cpus, 1), maxMem = Math.max(Math.floor((HOST.memMB || hw.memMB) / 256) * 256, hw.memMB);
   const tickLeft = f => `calc(${f} * (100% - 18px) + 9px)`;
-  const mk = (label, min, max, step, val, fmt) => {
+  const mk = (label, min, max, step, val, fmt, unit) => {
     const out = el('b', { textContent: fmt(val) });
     const sl = el('input', { type: 'range', className: 'form-slider', min, max, step, value: val, disabled: !stopped });
     const fill = el('div', { className: 'slider-fill' });
@@ -522,16 +522,17 @@ function partSpec(v) {
     const upd = () => wrap.style.setProperty('--sl-stop', `calc(${(sl.value - min) / (max - min)} * (100% - 18px) + 9px)`);
     sl.addEventListener('input', () => { out.textContent = fmt(+sl.value); upd(); sync(); });
     upd();
-    // 5 段等分刻度(min..max),刻度值取到 step 的倍數
+    // 刻度取「好讀的整數倍」(2、4、6… 或 GB 的整數倍),不超過 6 個,只列出範圍內的值
     const ticks = el('div', { className: 'slider-ticklabels' + (stopped ? '' : ' dim') });
-    for (let i = 0; i <= 4; i++) {
-      const raw = min + (max - min) * i / 4, t = i === 4 ? max : Math.round(raw / step) * step;
-      ticks.append(el('span', { textContent: fmt(t), style: 'left:' + tickLeft((t - min) / (max - min)) }));
+    let st = 1; while ((max - min) / unit / st > 6 + 1e-9 && st < 1024) st *= 2;
+    for (let k = Math.ceil(min / unit / st); k * st * unit <= max; k++) {
+      const t = k * st * unit;
+      ticks.append(el('span', { textContent: String(t / unit), style: 'left:' + tickLeft((t - min) / (max - min)) }));
     }
     return { sl, node: el('div', { className: 'spec-row' }, el('div', { className: 'spec-label' }, el('span', { textContent: label }), out), wrap, ticks) };
   };
-  const cpu = mk('CPU 核心數', 1, maxCpu, 1, hw.cpus, x => x + ' 核');
-  const mem = mk('記憶體', 512, maxMem, 256, hw.memMB, fmtMem);
+  const cpu = mk('CPU 核心數', 1, maxCpu, 1, hw.cpus, x => x + ' 核', 1);
+  const mem = mk('記憶體(刻度單位:GB)', 512, maxMem, 256, hw.memMB, fmtMem, 1024);
   const apply = btn('套用', async () => {
     await api('POST', `vm/${v.uuid}/spec`, { cpus: +cpu.sl.value, memMB: +mem.sl.value });
     msg('已更新「' + v.name + '」的規格');
