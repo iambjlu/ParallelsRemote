@@ -120,10 +120,12 @@ details.card > .vm-body { margin-top: 0; }
 .form-slider:disabled { cursor: not-allowed; }
 .form-slider:disabled::-webkit-slider-thumb { background: rgba(128,128,128,0.3); box-shadow: none; border: none; }
 /* 刻度:位置公式與 .slider-fill 的停止點一致,數字才會對準把手實際停留處 */
-.slider-ticklabels { position: relative; height: 14px; margin: 18px 0 6px; font-size: 10px; color: var(--muted); pointer-events: none; }
+.slider-ticklabels { position: relative; z-index: 1; height: 14px; margin: 14px 0 6px; font-size: 10px; color: var(--muted); pointer-events: none; }
 .slider-ticklabels span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
-.slider-ticklabels span::before { content: ''; position: absolute; left: 50%; top: -9px; width: 4px; height: 4px; border-radius: 50%;
-  background: rgba(255,255,255,0.4); transform: translateX(-50%); }
+/* 刻度點嵌在軌道上(軌道中心在數字列上方 18px):每個停靠點一個小點,標了數字的點較大較亮 */
+.slider-ticklabels span::before { content: ''; position: absolute; left: 50%; top: -20px; width: 4px; height: 4px; border-radius: 50%;
+  background: rgba(255,255,255,0.5); transform: translateX(-50%); }
+.slider-ticklabels span.lb::before { top: -21px; width: 6px; height: 6px; background: rgba(255,255,255,0.9); }
 .slider-ticklabels.dim { opacity: .35; }
 .spec-actions { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
 .empty { font-size: 12px; color: var(--muted); padding: 2px 0 6px; }
@@ -538,7 +540,7 @@ function partSpec(v) {
     if (gap === n1 && n1 > 6) gap = Math.ceil(n1 / 6);   // 沒有適合的整除間隔:退而求其次,最後一個一定標數字
     vals.forEach((t, i) => {
       const labeled = i === n1 || (i % gap === 0 && n1 - i >= gap / 2);   // 倒數第二個標籤太貼近上限就略過
-      ticks.append(el('span', { textContent: labeled ? String(+(t / unit).toFixed(2)) : '', style: 'left:' + tickLeft(i / n1) }));
+      ticks.append(el('span', { className: labeled ? 'lb' : '', textContent: labeled ? String(+(t / unit).toFixed(2)) : '', style: 'left:' + tickLeft(i / n1) }));
     });
     res.node = el('div', { className: 'spec-row' }, el('div', { className: 'spec-label' }, el('span', { textContent: label }), out), wrap, ticks);
     return res;
