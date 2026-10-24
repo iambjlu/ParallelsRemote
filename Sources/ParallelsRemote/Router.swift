@@ -7,6 +7,7 @@ struct Router: Sendable {
 
     func handle(_ req: HTTPRequest) async -> HTTPResponse {
         if req.method == "GET" && (req.path == "/" || req.path == "/index.html") { return .html(webPage) }
+        if req.method == "GET", let asset = Self.pwaAsset(req.path) { return asset }   // PWA 靜態資源(不含機敏資料)
         guard req.path.hasPrefix("/api/") else { return .error(404, "Not Found") }
 
         // 不需要登入的端點:查詢登入狀態、登入、登出
@@ -29,6 +30,20 @@ struct Router: Sendable {
         do { return try await route(req) }
         catch let e as APIError { return .error(e.status, e.message) }
         catch { return .error(500, "\(error)") }
+    }
+
+    private static func pwaAsset(_ path: String) -> HTTPResponse? {
+        switch path {
+        case "/manifest.webmanifest":
+            return HTTPResponse(contentType: "application/manifest+json; charset=utf-8", body: Data(PWA.manifest.utf8))
+        case "/sw.js":
+            return HTTPResponse(contentType: "text/javascript; charset=utf-8", body: Data(PWA.serviceWorker.utf8),
+                                headers: ["Service-Worker-Allowed": "/"])
+        case "/icon-192.png": return HTTPResponse(contentType: "image/png", body: PWA.icon192)
+        case "/icon-512.png": return HTTPResponse(contentType: "image/png", body: PWA.icon512)
+        case "/icon-maskable-512.png": return HTTPResponse(contentType: "image/png", body: PWA.iconMaskable512)
+        default: return nil
+        }
     }
 
     private func login(_ req: HTTPRequest) -> HTTPResponse {

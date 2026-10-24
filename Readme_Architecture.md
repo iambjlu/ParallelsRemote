@@ -27,6 +27,7 @@ Sources/ParallelsRemote/
   Config.swift                 config.json
   Shell.swift                  外部程式執行(參數陣列,不經 shell)
   Web.swift                    單頁網頁(HTML + CSS + JS,整份是一個字串常數)
+  PWA.swift                    manifest、service worker 與圖示(PNG 以 base64 內嵌)
 ```
 
 ## App.swift
@@ -47,7 +48,7 @@ Sources/ParallelsRemote/
 - `applicationShouldHandleReopen` 透過 `Notification` 通知常駐的 `MenuBarLabel`,由它呼叫 `openWindow` 開窗(AppDelegate 本身拿不到 `openWindow`)。
 - 打包後的 `Info.plist` 設 `LSUIElement`,避免啟動瞬間閃出 Dock 圖示。
 
-**選單列**(`MenuBarExtra`):服務狀態、各網卡連線網址(點擊拷貝)、開啟主視窗、結束。
+**選單列**(`MenuBarExtra`,視窗樣式):面板內用 SwiftUI `Grid` 排版,標籤欄與數值欄各自對齊(服務、協定、連接埠、登入密碼,以及「網卡名稱 → IP:埠」);點 IP 拷貝完整網址並短暫顯示打勾;底部是「開啟主視窗…」與「結束」。原生選單樣式(`.menu`)無法做欄位對齊,所以改用視窗樣式。
 
 **設定視窗**(`SettingsView`):連線網址與連接埠、密碼設定(兩次輸入一致才能送出)、HTTPS 開關與重新產生憑證、登入時自動啟動、SSH 轉發起始埠、操作結果提示。
 
@@ -156,6 +157,10 @@ Cookie 屬性:`HttpOnly`(網頁 JS 讀不到)、`SameSite=Strict`、`Path=/`、`
 
 `Shell.run` / `Shell.check` 以 `Process` 執行外部程式,stdout 與 stderr 同時讀取避免管線塞滿而死鎖;`check` 在結束碼非 0 時丟出帶有錯誤輸出的 `ShellError`。
 
+## PWA.swift
+
+提供 `/manifest.webmanifest`(`display: standalone`)、`/sw.js`(不快取任何內容的最精簡 service worker,只為了讓瀏覽器視為可安裝)與三個圖示:`/icon-192.png`、`/icon-512.png`、`/icon-maskable-512.png`。這些資源不含機敏資料,不需要登入,由 `Router.pwaAsset` 在登入檢查之前直接回傳。圖示是程式產生的 PNG(深灰底、金色三層伺服器機架),以 base64 內嵌。service worker 只在 secure context 註冊,失敗不影響一般使用。
+
 ## Web.swift(單頁網頁)
 
 整個前端是一個字串常數,由 `GET /` 回傳。外觀參考 DragonVM 的冷灰 + 琥珀金配色,為節省手機 GPU 不使用 `backdrop-filter`、光暈陰影與動畫。字型使用系統字型並以非阻塞方式載入 Google Fonts 的 Inter(外網不通時頁面也不會卡住)。
@@ -166,6 +171,7 @@ Cookie 屬性:`HttpOnly`(網頁 JS 讀不到)、`SameSite=Strict`、`Path=/`、`
 - **對話框**:`dgDialog` 取代瀏覽器原生 `alert / confirm / prompt`,按鈕為全寬堆疊;`dgConfirm`、`dgPrompt` 為其包裝。取消操作以 `CANCEL` 物件表示,按鈕處理函式會靜默結束而不顯示錯誤。
 - **登入**:任何 API 回 `401` 時自動跳出密碼對話框,成功後重試原請求;已設定密碼時右上角出現人頭圖示,內含登出。
 - **拷貝**:區網 `http://` 不是 secure context,`navigator.clipboard` 不可用,所以使用 `textarea` + `execCommand('copy')` 後備;失敗時會明確顯示失敗,不假裝成功。
+- **PWA 與安全區域**:`viewport-fit=cover` 搭配 iOS 的 `black-translucent` 狀態列時,內容會延伸到狀態列 / 動態島底下,所以標題列、主要內容與提示訊息都用 `env(safe-area-inset-*)` 留出安全區域。
 - **禁止雙擊放大與選取文字**:`touch-action: manipulation`、`user-select: none`(輸入框例外)。
 
 ## 安全設計摘要

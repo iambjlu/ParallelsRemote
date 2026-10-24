@@ -33,8 +33,8 @@ final class AppState: ObservableObject {
     var scheme: String { config.https == true ? "https" : "http" }
 
     /// 各網路介面的連線網址(含 Tailscale)
-    var urls: [(name: String, url: String)] {
-        Self.localIPv4().map { ($0.0, "\(scheme)://\($0.1):\(config.port)/") }
+    var urls: [(name: String, url: String, ipPort: String)] {
+        Self.localIPv4().map { ($0.0, "\(scheme)://\($0.1):\(config.port)/", "\($0.1):\(config.port)") }
     }
 
     // MARK: 伺服器
@@ -221,6 +221,7 @@ struct ParallelsRemoteApp: App {
         } label: {
             MenuBarLabel()
         }
+        .menuBarExtraStyle(.window)   // 視窗樣式才能用 Grid 讓標籤與 IP 的起點對齊
 
         Window(mainWindowTitle, id: "main") { SettingsView() }
             .defaultSize(width: 480, height: 640)
@@ -242,18 +243,59 @@ struct MenuBarLabel: View {
 struct MenuContent: View {
     @Environment(\.openWindow) private var openWindow
     @ObservedObject private var state = AppState.shared
+    /// 剛拷貝的網址,短暫顯示打勾回饋
+    @State private var copied: String?
 
     var body: some View {
-        Text("服務:\(state.serverStatus)")
-        ForEach(state.urls, id: \.url) { item in
-            Button("\(item.name)  \(item.url)") { state.copy(item.url) }
+        VStack(alignment: .leading, spacing: 10) {
+            // 標籤欄與數值欄各自對齊(Grid 讓每一列的第二欄起點相同)
+            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+                row("服務", state.serverStatus)
+                row("協定", state.scheme.uppercased())
+                row("連接埠", String(state.config.port))
+                row("登入密碼", state.hasPassword ? "已設定" : "未設定")
+            }
+
+            Divider()
+
+            Text("連線網址(點一下拷貝)").font(.caption).foregroundStyle(.secondary)
+            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+                ForEach(state.urls, id: \.url) { item in
+                    GridRow {
+                        Text(item.name).foregroundStyle(.secondary)
+                        Button {
+                            state.copy(item.url)
+                            copied = item.url
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { if copied == item.url { copied = nil } }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text(item.ipPort)
+                                if copied == item.url { Image(systemName: "checkmark").foregroundStyle(.green) }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .help(item.url)
+                    }
+                }
+            }
+
+            Divider()
+
+            HStack {
+                Button("開啟主視窗…") { showMainWindow(openWindow) }
+                Spacer()
+                Button("結束") { NSApp.terminate(nil) }
+            }
         }
-        Divider()
-        Button("開啟主視窗…") { showMainWindow(openWindow) }
-            .keyboardShortcut(",")
-        Divider()
-        Button("結束 Parallels Remote") { NSApp.terminate(nil) }
-            .keyboardShortcut("q")
+        .padding(14)
+        .frame(width: 300)
+    }
+
+    private func row(_ label: String, _ value: String) -> some View {
+        GridRow {
+            Text(label).foregroundStyle(.secondary)
+            Text(value)
+        }
     }
 }
 

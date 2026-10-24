@@ -15,6 +15,7 @@ Mac 端是一個常駐選單列的 SwiftUI App,內建網頁伺服器;手機用�
 - **端口轉發**:依機器分組顯示,可新增 / 刪除,並可拷貝「目前連線位址:Mac 埠」
 - **登入密碼**:在 Mac 的設定視窗設定,網頁端要輸入密碼才能控制
 - **HTTPS(自簽憑證)**:可選;同一個埠收到明文 HTTP 會自動轉址到 `https://`
+- **PWA**:可以「加到主畫面」,以獨立視窗(無瀏覽器網址列)開啟;已處理 iPhone 動態島 / 狀態列的安全區域
 - **網卡名稱**:選單列與設定視窗顯示系統上的網卡名稱(例如 Wi-Fi、Ethernet、Tailscale),不是 `en0` 這類代號
 - **選單列常駐**:啟動時只在選單列;開啟主視窗期間 Dock 才有圖示,關掉後回到只有選單列
 
@@ -49,6 +50,12 @@ scripts/make_app.sh       # 打包成 build/ParallelsRemote.app(ad-hoc 簽章)
 | SSH 轉發起始埠 | 複製機器時自動建立的 SSH 轉發從這個埠往上分配 |
 
 資料存放在 `~/Library/Application Support/ParallelsRemote/`(`config.json`、`auth.json`、`tls/`)。
+
+## 加到手機主畫面(PWA)
+
+網頁提供 manifest、圖示與 service worker。iPhone:Safari 分享 →「加入主畫面」;Android(Edge / Chrome):選單 →「新增至電話」/「安裝應用程式」。
+
+注意:使用自簽憑證時,Chrome / Edge 可能只會建立捷徑,而不是正式安裝成 App;iPhone 實測可以正常以獨立視窗開啟。
 
 ## 使用上的注意事項
 

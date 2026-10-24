@@ -7,6 +7,13 @@ let webPage = #"""
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#2E2F31">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Parallels">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Parallels Remote</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,15 +36,17 @@ body {
   min-height: 100vh; color: var(--text); font-size: 15px; line-height: 1.45;
   font-family: '-apple-system', 'BlinkMacSystemFont', 'SF Pro', 'SF Pro Display', 'PingFang TC', 'Inter', 'Roboto', 'AppleGothic', 'Microsoft JhengHei UI', sans-serif;
   background: linear-gradient(160deg, #9E9E9E 0%, #6F7174 40%, #4A4B4D 100%);
-  padding: 0 0 80px;
+  padding: 0 0 calc(80px + env(safe-area-inset-bottom));
 }
 header {
   position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px;
-  padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+  /* PWA 全螢幕時內容會延伸到狀態列 / 動態島底下,標題列要自己留出安全區域 */
+  padding: calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left));
+  background: var(--surface); border-bottom: 1px solid var(--border);
 }
 header { gap: 8px; }
 header h1 { flex: 1; font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
-main { max-width: 720px; margin: 0 auto; padding: 14px 12px 0; display: flex; flex-direction: column; gap: 14px; }
+main { max-width: 720px; margin: 0 auto; padding: 14px max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)); display: flex; flex-direction: column; gap: 14px; }
 
 /* 按鈕 */
 button, select, input { font-family: inherit; }
@@ -558,6 +567,8 @@ let clickTimer;
 document.addEventListener('click', () => { clearTimeout(clickTimer); clickTimer = setTimeout(load, 400); });
 
 load();
+// PWA:註冊 service worker(需要 secure context;失敗不影響一般使用)
+if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/sw.js').catch(() => {});
 </script>
 </body>
 </html>
