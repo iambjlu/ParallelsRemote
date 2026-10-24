@@ -169,8 +169,9 @@ Cookie 屬性:`HttpOnly`(網頁 JS 讀不到)、`SameSite=Strict`、`Path=/`、`
 - **差異更新**:每張卡片拆成 `head / ips / actions / nics / fw` 區塊,各自計算內容特徵(`partSigs`);刷新時只替換特徵有變的區塊,沒變的 DOM 節點完全不動,因此展開狀態、輸入到一半的欄位、捲動位置都會保留。卡片以 UUID 為鍵,新增 / 移除 / 排序只動有差異的節點。快照清單在展開時靜默重抓,內容沒變就不替換。
 - **刷新時機**:頁面載入、操作完成後,以及點擊畫面任何位置(0.4 秒內連點只刷新一次)。同時只跑一個刷新,刷新途中又被要求時在結束後補跑一次。
 - **對話框**:`dgDialog` 取代瀏覽器原生 `alert / confirm / prompt`,按鈕為全寬堆疊;`dgConfirm`、`dgPrompt` 為其包裝。取消操作以 `CANCEL` 物件表示,按鈕處理函式會靜默結束而不顯示錯誤。
-- **登入**:任何 API 回 `401` 時自動跳出密碼對話框,成功後重試原請求;已設定密碼時右上角出現人頭圖示,內含登出。
+- **登入**:任何 API 回 `401` 時自動跳出密碼對話框,成功後重試原請求。登入是必要步驟,所以對話框是 `modal`:沒有取消鈕,點旁邊空白處也不會關閉。已設定密碼時右上角出現人頭圖示,點開確認後登出,登出完成會 `location.reload()` 重新載入頁面,清掉殘留的機器清單與狀態。
 - **拷貝**:區網 `http://` 不是 secure context,`navigator.clipboard` 不可用,所以使用 `textarea` + `execCommand('copy')` 後備;失敗時會明確顯示失敗,不假裝成功。
+- **iOS 獨立視窗的標題列保底**:加到主畫面後 `env(safe-area-inset-top)` 可能回報 0,標題列會被動態島 / 狀態列蓋住。因此在 `display-mode: standalone` 且為 iOS(以只有 iOS WebKit 支援的 `-webkit-touch-callout` 辨識)時,標題列頂部間距取 `max(env(safe-area-inset-top), 56px) + 8px`。
 - **PWA 與安全區域**:`viewport-fit=cover` 搭配 iOS 的 `black-translucent` 狀態列時,內容會延伸到狀態列 / 動態島底下,所以標題列、主要內容與提示訊息都用 `env(safe-area-inset-*)` 留出安全區域。
 - **禁止雙擊放大與選取文字**:`touch-action: manipulation`、`user-select: none`(輸入框例外)。
 
