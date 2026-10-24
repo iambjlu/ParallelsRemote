@@ -39,7 +39,10 @@ body {
   padding: 0 0 calc(80px + env(safe-area-inset-bottom));
 }
 header {
-  position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px;
+  position: sticky; top: 0; z-index: 50;
+  /* iOS WebKit 快速捲動時,sticky 元素偶爾不重繪(看起來像消失)。
+     讓標題列獨立成一個合成圖層可以避免;只有一小塊,不影響效能。 */
+  -webkit-transform: translateZ(0); transform: translateZ(0); will-change: transform; display: flex; align-items: center; gap: 10px;
   /* PWA 全螢幕時內容會延伸到狀態列 / 動態島底下,標題列要自己留出安全區域 */
   padding: calc(22px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left));
   background: var(--surface); border-bottom: 1px solid var(--border);

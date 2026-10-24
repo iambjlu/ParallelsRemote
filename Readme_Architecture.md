@@ -172,6 +172,7 @@ Cookie 屬性:`HttpOnly`(網頁 JS 讀不到)、`SameSite=Strict`、`Path=/`、`
 - **登入**:任何 API 回 `401` 時自動跳出密碼對話框,成功後重試原請求。登入是必要步驟,所以對話框是 `modal`:沒有取消鈕,點旁邊空白處也不會關閉。已設定密碼時右上角出現人頭圖示,點開確認後登出,登出完成會 `location.reload()` 重新載入頁面,清掉殘留的機器清單與狀態。
 - **拷貝**:區網 `http://` 不是 secure context,`navigator.clipboard` 不可用,所以使用 `textarea` + `execCommand('copy')` 後備;失敗時會明確顯示失敗,不假裝成功。
 - **iOS 獨立視窗的標題列保底**:加到主畫面後 `env(safe-area-inset-top)` 可能回報 0,標題列會被動態島 / 狀態列蓋住。因此在 `display-mode: standalone` 且為 iOS(以只有 iOS WebKit 支援的 `-webkit-touch-callout` 辨識)時,標題列頂部間距取 `max(env(safe-area-inset-top), 56px) + 8px`。
+- **標題列**:`position: sticky`,`z-index: 50`(低於對話框的 100,高於所有卡片),並以 `translateZ(0)` / `will-change: transform` 獨立成合成圖層,避免 iOS WebKit 快速捲動時 sticky 元素不重繪而看起來消失。
 - **PWA 與安全區域**:`viewport-fit=cover` 搭配 iOS 的 `black-translucent` 狀態列時,內容會延伸到狀態列 / 動態島底下,所以標題列、主要內容與提示訊息都用 `env(safe-area-inset-*)` 留出安全區域。
 - **禁止雙擊放大與選取文字**:`touch-action: manipulation`、`user-select: none`(輸入框例外)。
 
