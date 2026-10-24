@@ -86,6 +86,7 @@ button, select, input { font-family: inherit; }
 .net { flex: none; min-width: 64px; text-align: center; font-size: 11px; padding: 2px 8px; border-radius: 8px; color: var(--accent); background: rgba(255,215,0,0.12); }
 #vms { display: flex; flex-direction: column; gap: 14px; }
 .actions { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
+.actions .push { margin-left: auto; }   /* 第一個紅色按鈕把自己和後面的推到最右邊 */
 
 details.card > summary { list-style: none; cursor: pointer; }
 details.card > summary::-webkit-details-marker { display: none; }
@@ -478,10 +479,14 @@ function partActions(v) {
     btn('關機(正常關機)', () => api('POST', `vm/${v.uuid}/stop`), '', 'stop'),
     btn('休眠', () => api('POST', `vm/${v.uuid}/suspend`), '', 'hibernate'),
     btn('暫停', () => api('POST', `vm/${v.uuid}/pause`), '', 'pause'),
-    revertBtn(),
-    btn('強制關機', async () => { if (!await dgConfirm('強制關機?', '「' + v.name + '」會被直接切斷電源,相當於拔插頭。', '強制關機', true)) throw CANCEL; await api('POST', `vm/${v.uuid}/kill`); }, 'danger', 'kill'));
-  actions.append(btn('刪除', () => deleteVM(v), 'danger', 'del'));
+    revertBtn());
   if (v.status === 'stopped' || run || susp) actions.append(btn('複製', () => cloneVM(v), '', 'clone'));
+  // 紅色(危險)按鈕固定放在最右邊,和一般按鈕分開
+  const danger = [];
+  if (run) danger.push(btn('強制關機', async () => { if (!await dgConfirm('強制關機?', '「' + v.name + '」會被直接切斷電源,相當於拔插頭。', '強制關機', true)) throw CANCEL; await api('POST', `vm/${v.uuid}/kill`); }, 'danger', 'kill'));
+  danger.push(btn('刪除', () => deleteVM(v), 'danger', 'del'));
+  danger[0].classList.add('push');
+  actions.append(...danger);
   return actions;
 }
 // 網卡(僅執行中的機器能拔掉/連回,這是 Parallels 的限制)
