@@ -96,7 +96,7 @@ details.card > .vm-body { margin-top: 0; }
 .sub-title { font-size: 13px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
 .sub-title small { font-weight: 400; color: var(--muted); font-size: 11px; }
 /* 規格滑桿(CPU / 記憶體),樣式參考 DragonGuardian 的 .form-slider:金色填充、橢圓玻璃把手 */
-.spec-line { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.spec-line { font-weight: 400; font-size: 12px; color: var(--muted); }
 .spec-row { margin-top: 10px; }
 .spec-label { display: flex; justify-content: space-between; font-size: 13px; }
 .spec-label b { color: var(--accent); font-weight: 600; }
@@ -191,6 +191,7 @@ if (navigator.standalone === true && [852, 874, 932, 956].includes(Math.max(scre
 }
 const STATUS = { stopped: '已關機', running: '執行中', suspended: '已休眠', paused: '已暫停' };
 const openSnaps = new Set();
+const openSpecs = new Set();
 const openVMs = new Set();
 let msgTimer;
 const norm = id => id.replace(/[{}]/g, '').toLowerCase();
@@ -487,10 +488,13 @@ function partNics(v) {
 function fmtMem(mb) { return mb % 1024 === 0 ? (mb / 1024) + ' GB' : (mb / 1024).toFixed(1) + ' GB'; }
 // 規格(CPU / 記憶體):展開即可看到;只有已關機的機器能修改(Parallels 的限制)
 function partSpec(v) {
-  const hw = v.hw, box = el('div', { className: 'sub' }, el('div', { className: 'sub-title' }, '規格'));
-  if (!hw) { box.append(el('div', { className: 'empty', textContent: '(無法取得規格)' })); return box; }
+  const hw = v.hw, body = el('div', { className: 'body' });
+  const box = el('details', { className: 'sub' }, el('summary', {}, el('span', { className: 'grow', textContent: '規格' }),
+    el('small', { className: 'spec-line', textContent: hw ? hw.cpus + ' 核心 · ' + fmtMem(hw.memMB) : '' }), caret()), body);
+  box.open = openSpecs.has(v.uuid);   // 預設收合;重畫時保留使用者展開的狀態
+  box.addEventListener('toggle', () => { if (box.open) openSpecs.add(v.uuid); else openSpecs.delete(v.uuid); });
+  if (!hw) { body.append(el('div', { className: 'empty', textContent: '(無法取得規格)' })); return box; }
   const stopped = v.status === 'stopped';
-  box.append(el('div', { className: 'spec-line', textContent: hw.cpus + ' 核心 · ' + fmtMem(hw.memMB) + ' 記憶體' }));
   const maxCpu = HOST.cpus || Math.max(hw.cpus, 1), maxMem = Math.max(Math.floor((HOST.memMB || hw.memMB) / 256) * 256, hw.memMB);
   const mk = (label, min, max, step, val, fmt) => {
     const out = el('b', { textContent: fmt(val) });
@@ -509,8 +513,8 @@ function partSpec(v) {
   }, 'small primary');
   const sync = () => { apply.disabled = !stopped || (+cpu.sl.value === hw.cpus && +mem.sl.value === hw.memMB); };
   sync();
-  box.append(cpu.node, mem.node);
-  box.append(stopped ? el('div', { className: 'spec-actions' }, apply)
+  body.append(cpu.node, mem.node);
+  body.append(stopped ? el('div', { className: 'spec-actions' }, apply)
     : el('div', { className: 'empty', textContent: '需先關機才能修改規格' }));
   return box;
 }
