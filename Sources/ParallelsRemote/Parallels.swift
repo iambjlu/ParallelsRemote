@@ -160,6 +160,22 @@ actor Parallels {
 
     // MARK: 規格(CPU / 記憶體)
 
+    /// 這台 Mac 的 Tailscale IPv4(100.64.0.0/10,且網卡已啟用);沒有則回 nil。
+    static func tailscaleIPv4() -> String? {
+        var ifap: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&ifap) == 0, let first = ifap else { return nil }
+        defer { freeifaddrs(ifap) }
+        for p in sequence(first: first, next: { $0.pointee.ifa_next }) {
+            let f = Int32(p.pointee.ifa_flags)
+            guard f & IFF_UP != 0, f & IFF_RUNNING != 0, let sa = p.pointee.ifa_addr, sa.pointee.sa_family == UInt8(AF_INET) else { continue }
+            var buf = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            guard getnameinfo(sa, socklen_t(sa.pointee.sa_len), &buf, socklen_t(buf.count), nil, 0, NI_NUMERICHOST) == 0 else { continue }
+            let ip = String(cString: buf)
+            if let v = ipv4Value(ip), v & 0xFFC0_0000 == 0x6440_0000 { return ip }
+        }
+        return nil
+    }
+
     static var hostCPUs: Int { ProcessInfo.processInfo.processorCount }
     static var hostMemMB: Int { Int(ProcessInfo.processInfo.physicalMemory / 1_048_576) }
 

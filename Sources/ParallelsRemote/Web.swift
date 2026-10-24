@@ -455,9 +455,19 @@ function snapSection(vm) {
 }
 
 // ───────── 每張卡片拆成幾個區塊,各自用「內容特徵」判斷要不要重畫 ─────────
+// 卡片標題旁的按鈕:拷貝這台 Mac 的 Tailscale IP(虛擬機本身不在 Tailscale 內)。標題列是 <summary>,所以要擋掉展開 / 收合
+function tsBtn() {
+  if (!HOST.tailscale) return '';
+  const ip = HOST.tailscale;
+  const b = el('button', { type: 'button', className: 'btn small icon', title: '拷貝 Tailscale IP ' + ip,
+    onclick: ev => { ev.preventDefault(); ev.stopPropagation(); copyText(ip); } });
+  b.setAttribute('aria-label', '拷貝 Tailscale IP ' + ip);
+  b.innerHTML = COPY_SVG;
+  return b;
+}
 function partHead(v) {
   return el('div', { className: 'vm-head' }, el('span', { className: 'dot ' + v.status }),
-    el('span', { className: 'vm-name', textContent: v.name }), caret());
+    el('span', { className: 'vm-name', textContent: v.name }), tsBtn(), caret());
 }
 function partIps(v, mine) {
   // v.ips: [{ip, net}];停止中的機器沒有 IP
@@ -591,7 +601,7 @@ const BUILD = { head: partHead, ips: partIps, actions: partActions, spec: partSp
 function partSigs(v, forwards) {
   const mine = forwards.filter(f => norm(f.target) === norm(v.uuid));
   return { mine, sig: {
-    head: v.name + '|' + v.status,
+    head: v.name + '|' + v.status + '|' + (HOST.tailscale || ''),
     ips: v.status + '|' + JSON.stringify(v.ips || null) + '|' + v.ip_configured + '|' + JSON.stringify(mine) + '|' + location.hostname,
     actions: v.status + '|' + v.name + '|' + v.uuid,
     spec: v.status + '|' + JSON.stringify(v.hw || null) + '|' + HOST.cpus + '|' + HOST.memMB,
