@@ -122,8 +122,8 @@ details.card > .vm-body { margin-top: 0; }
 /* 刻度:位置公式與 .slider-fill 的停止點一致,數字才會對準把手實際停留處 */
 .slider-ticklabels { position: relative; height: 14px; margin: 18px 0 6px; font-size: 10px; color: var(--muted); pointer-events: none; }
 .slider-ticklabels span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
-.slider-ticklabels span::before { content: ''; position: absolute; left: 50%; top: -7px; width: 1px; height: 4px;
-  background: rgba(255,255,255,0.28); transform: translateX(-50%); }
+.slider-ticklabels span::before { content: ''; position: absolute; left: 50%; top: -9px; width: 4px; height: 4px; border-radius: 50%;
+  background: rgba(255,255,255,0.4); transform: translateX(-50%); }
 .slider-ticklabels.dim { opacity: .35; }
 .spec-actions { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
 .empty { font-size: 12px; color: var(--muted); padding: 2px 0 6px; }
@@ -514,7 +514,7 @@ function partSpec(v) {
   const stopped = v.status === 'stopped';
   const maxCpu = HOST.cpus || Math.max(hw.cpus, 1), maxMem = Math.max(Math.floor((HOST.memMB || hw.memMB) / 256) * 256, hw.memMB);
   const tickLeft = f => `calc(${f} * (100% - 18px) + 9px)`;
-  const mk = (label, min, max, step, val, fmt, unit, showMin) => {
+  const mk = (label, min, max, step, val, fmt, unit) => {
     const out = el('b', { textContent: fmt(val) });
     const sl = el('input', { type: 'range', className: 'form-slider', min, max, step, value: val, disabled: !stopped });
     const fill = el('div', { className: 'slider-fill' });
@@ -522,19 +522,24 @@ function partSpec(v) {
     const upd = () => wrap.style.setProperty('--sl-stop', `calc(${(sl.value - min) / (max - min)} * (100% - 18px) + 9px)`);
     sl.addEventListener('input', () => { out.textContent = fmt(+sl.value); upd(); sync(); });
     upd();
-    // 刻度取「好讀的整數倍」(2、4、6… 或 GB 的整數倍),不超過 6 個,只列出範圍內的值
+    // 刻度:最左是最小值,之後每個整數單位一個點,最右是上限;數字最多標 7 個且等距
+    // (間隔取能整除的最小值,讓最右邊的上限一定有數字)
     const ticks = el('div', { className: 'slider-ticklabels' + (stopped ? '' : ' dim') });
-    const lim = showMin ? 8 : 6;
-    let st = 1; while ((max - min) / unit / st > lim + 1e-9 && st < 1024) st *= 2;
-    const vals = showMin ? [min] : [];   // 記憶體最小值(0.5 GB)不是整數倍,另外列出
-    for (let k = Math.ceil(min / unit / st); k * st * unit <= max; k++) if (k * st * unit > min || !showMin) vals.push(k * st * unit);
-    for (const t of vals) {
-      ticks.append(el('span', { textContent: String(t / unit), style: 'left:' + tickLeft((t - min) / (max - min)) }));
-    }
+    const vals = [min];
+    for (let k = Math.floor(min / unit) + 1; k * unit <= max; k++) vals.push(k * unit);
+    if (vals[vals.length - 1] !== max) vals.push(max);
+    const n1 = vals.length - 1;
+    let gap = 1; while (n1 / gap + 1 > 7 && gap < n1) gap++;
+    while (n1 % gap !== 0 && gap < n1) gap++;
+    if (gap === n1 && n1 > 6) gap = Math.ceil(n1 / 6);   // 沒有適合的整除間隔:退而求其次,最後一個一定標數字
+    vals.forEach((t, i) => {
+      const labeled = i % gap === 0 || i === n1;
+      ticks.append(el('span', { textContent: labeled ? String(+(t / unit).toFixed(2)) : '', style: 'left:' + tickLeft((t - min) / (max - min)) }));
+    });
     return { sl, node: el('div', { className: 'spec-row' }, el('div', { className: 'spec-label' }, el('span', { textContent: label }), out), wrap, ticks) };
   };
   const cpu = mk('CPU 核心數', 1, maxCpu, 1, hw.cpus, x => x + ' 核', 1);
-  const mem = mk('記憶體(刻度單位:GB)', 512, maxMem, 256, hw.memMB, fmtMem, 1024, true);
+  const mem = mk('記憶體(刻度單位:GB)', 512, maxMem, 256, hw.memMB, fmtMem, 1024);
   const apply = btn('套用', async () => {
     await api('POST', `vm/${v.uuid}/spec`, { cpus: +cpu.sl.value, memMB: +mem.sl.value });
     msg('已更新「' + v.name + '」的規格');
