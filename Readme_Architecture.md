@@ -16,7 +16,8 @@
 
 ```
 Package.swift
-scripts/make_app.sh            打包成 .app(Info.plist、ad-hoc 簽章)
+scripts/make_app.sh            打包成 .app(Info.plist、App 圖示、ad-hoc 簽章)
+scripts/make_icon.swift        從 PWA.swift 內嵌的 512 圖示產生 AppIcon.icns(縮成 80% 置中留邊)
 Sources/ParallelsRemote/
   App.swift                    App 進入點、AppState、選單列、設定視窗
   HTTPServer.swift             NWListener 簡易 HTTP 伺服器、HTTPS 前門
