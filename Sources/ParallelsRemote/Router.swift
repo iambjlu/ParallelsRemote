@@ -78,7 +78,8 @@ struct Router: Sendable {
                 ["proto": f.proto, "name": f.name ?? NSNull(), "sourcePort": f.sourcePort,
                  "target": f.target, "destPort": f.destPort, "managed": f.managed]
             }
-            return .json(["vms": try await vms, "forwards": forwards])
+            return .json(["vms": try await vms, "forwards": forwards,
+                          "host": ["cpus": Parallels.hostCPUs, "memMB": Parallels.hostMemMB]])
         }
 
         if p.count == 2, p[0] == "vm", m == "DELETE" {
@@ -97,6 +98,9 @@ struct Router: Sendable {
             }
             if p.count == 5, m == "POST", p[2] == "nic", p[4] == "connect" || p[4] == "disconnect" {
                 try await prl.setNIC(id: id, nic: p[3], connect: p[4] == "connect"); return ok
+            }
+            if p.count == 3, m == "POST", p[2] == "spec" {
+                try await prl.setSpec(id: id, cpus: body["cpus"] as? Int ?? 0, memMB: body["memMB"] as? Int ?? 0); return ok
             }
             if p.count == 3, m == "POST", p[2] != "snapshots" {
                 try await prl.action(id: id, action: p[2]); return ok

@@ -95,6 +95,20 @@ details.card > .vm-body { margin-top: 0; }
 .sub { margin-top: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
 .sub-title { font-size: 13px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
 .sub-title small { font-weight: 400; color: var(--muted); font-size: 11px; }
+/* 規格滑桿(CPU / 記憶體),樣式參考 DragonGuardian 的 .form-slider:金色填充、橢圓玻璃把手 */
+.spec-line { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.spec-row { margin-top: 10px; }
+.spec-label { display: flex; justify-content: space-between; font-size: 13px; }
+.spec-label b { color: var(--accent); font-weight: 600; }
+.form-slider { display: block; width: 100%; -webkit-appearance: none; appearance: none; height: 8px; margin: 12px 0 6px;
+  border-radius: 9999px; outline: none; cursor: pointer; padding: 0; border: none;
+  background: linear-gradient(to right, var(--accent) var(--pct, 0%), rgba(128,128,128,0.25) var(--pct, 0%)); }
+.form-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 30px; border-radius: 9px; cursor: pointer;
+  background: linear-gradient(135deg, rgba(255,255,255,0.75) 0%, rgba(228,228,228,0.55) 100%);
+  border: 0.5px solid rgba(255,255,255,0.6); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+.form-slider:disabled { opacity: .35; cursor: not-allowed; }
+.spec-ticks { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); }
+.spec-actions { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
 .empty { font-size: 12px; color: var(--muted); padding: 2px 0 6px; }
 .row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
 .row:last-of-type { border-bottom: none; }
@@ -470,6 +484,36 @@ function partNics(v) {
   }
   return box;
 }
+function fmtMem(mb) { return mb % 1024 === 0 ? (mb / 1024) + ' GB' : (mb / 1024).toFixed(1) + ' GB'; }
+// 規格(CPU / 記憶體):展開即可看到;只有已關機的機器能修改(Parallels 的限制)
+function partSpec(v) {
+  const hw = v.hw, box = el('div', { className: 'sub' }, el('div', { className: 'sub-title' }, '規格'));
+  if (!hw) { box.append(el('div', { className: 'empty', textContent: '(無法取得規格)' })); return box; }
+  const stopped = v.status === 'stopped';
+  box.append(el('div', { className: 'spec-line', textContent: hw.cpus + ' 核心 · ' + fmtMem(hw.memMB) + ' 記憶體' }));
+  const maxCpu = HOST.cpus || Math.max(hw.cpus, 1), maxMem = Math.max(Math.floor((HOST.memMB || hw.memMB) / 256) * 256, hw.memMB);
+  const mk = (label, min, max, step, val, fmt) => {
+    const out = el('b', { textContent: fmt(val) });
+    const sl = el('input', { type: 'range', className: 'form-slider', min, max, step, value: val, disabled: !stopped });
+    const fill = () => sl.style.setProperty('--pct', ((sl.value - min) / (max - min) * 100) + '%');
+    sl.addEventListener('input', () => { out.textContent = fmt(+sl.value); fill(); sync(); });
+    fill();
+    return { sl, node: el('div', { className: 'spec-row' }, el('div', { className: 'spec-label' }, el('span', { textContent: label }), out), sl,
+      el('div', { className: 'spec-ticks' }, el('span', { textContent: fmt(min) }), el('span', { textContent: fmt(max) }))) };
+  };
+  const cpu = mk('CPU 核心數', 1, maxCpu, 1, hw.cpus, x => x + ' 核');
+  const mem = mk('記憶體', 512, maxMem, 256, hw.memMB, fmtMem);
+  const apply = btn('套用', async () => {
+    await api('POST', `vm/${v.uuid}/spec`, { cpus: +cpu.sl.value, memMB: +mem.sl.value });
+    msg('已更新「' + v.name + '」的規格');
+  }, 'small primary');
+  const sync = () => { apply.disabled = !stopped || (+cpu.sl.value === hw.cpus && +mem.sl.value === hw.memMB); };
+  sync();
+  box.append(cpu.node, mem.node);
+  box.append(stopped ? el('div', { className: 'spec-actions' }, apply)
+    : el('div', { className: 'empty', textContent: '需先關機才能修改規格' }));
+  return box;
+}
 function partFw(v, mine) {
   const fw = el('div', { className: 'sub' }, el('div', { className: 'sub-title' }, '端口轉發', el('small', { textContent: 'Mac 埠 → VM 埠' })));
   if (!mine.length) fw.append(el('div', { className: 'empty', textContent: '(沒有規則)' }));
@@ -487,18 +531,20 @@ function carryForm(oldEl, newEl) {
   oi.forEach((x, i) => { if (ni[i]) ni[i].value = x.value; });
 }
 
-const PARTS = ['head', 'ips', 'actions', 'nics', 'fw'];
-const BUILD = { head: partHead, ips: partIps, actions: partActions, nics: partNics, fw: partFw };
+const PARTS = ['head', 'ips', 'actions', 'spec', 'nics', 'fw'];
+const BUILD = { head: partHead, ips: partIps, actions: partActions, spec: partSpec, nics: partNics, fw: partFw };
 function partSigs(v, forwards) {
   const mine = forwards.filter(f => norm(f.target) === norm(v.uuid));
   return { mine, sig: {
     head: v.name + '|' + v.status,
     ips: v.status + '|' + JSON.stringify(v.ips || null) + '|' + v.ip_configured,
     actions: v.status + '|' + v.name + '|' + v.uuid,
+    spec: v.status + '|' + JSON.stringify(v.hw || null) + '|' + HOST.cpus + '|' + HOST.memMB,
     nics: v.status + '|' + v.name + '|' + JSON.stringify(v.nics || null),
     fw: v.uuid + '|' + JSON.stringify(mine) } };
 }
 
+let HOST = {};
 const cards = new Map();   // uuid -> { node, parts, sigs, snap, snapBody }
 function createCard(v, forwards) {
   const { mine, sig } = partSigs(v, forwards);
@@ -507,7 +553,7 @@ function createCard(v, forwards) {
   const snap = snapSection(v);
   const node = el('details', { className: 'card' },
     el('summary', {}, parts.head),
-    el('div', { className: 'vm-body' }, parts.ips, parts.actions, parts.nics, parts.fw, snap.node));
+    el('div', { className: 'vm-body' }, parts.ips, parts.actions, parts.spec, parts.nics, parts.fw, snap.node));
   node.open = openVMs.has(v.uuid);
   node.addEventListener('toggle', ev => {
     if (ev.target !== node) return;   // 忽略內層「快照」的 toggle
@@ -528,6 +574,7 @@ function updateCard(e, v, forwards) {
 
 let otherSig = '';
 function patch(s) {
+  HOST = s.host || {};
   const host = $('vms');
   const seen = new Set();
   s.vms.forEach((v, idx) => {

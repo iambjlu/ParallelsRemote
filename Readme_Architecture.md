@@ -88,7 +88,8 @@ Cookie 屬性:`HttpOnly`(網頁 JS 讀不到)、`SameSite=Strict`、`Path=/`、`
 | GET | `/api/session` | `{authRequired, authed}` |
 | POST | `/api/login` | `{password}`;成功設定 Cookie |
 | POST | `/api/logout` | 作廢目前 session |
-| GET | `/api/state` | `{vms, forwards}`:機器清單(含 `ips`、`nics`)與端口轉發 |
+| GET | `/api/state` | `{vms, forwards, host}`:機器清單(含 `ips`、`nics`、`hw`)、端口轉發與主機上限(`host.cpus`、`host.memMB`) |
+| POST | `/api/vm/:id/spec` | `{cpus, memMB}`,修改 CPU 與記憶體;機器必須是關機狀態 |
 | POST | `/api/vm/:id/{start,stop,kill,suspend,resume,pause,restart}` | 電源操作 |
 | POST | `/api/vm/:id/clone` | `{name?, start?}`,APFS 複製 |
 | POST | `/api/vm/:id/revert` | 回復到最後一個快照 |
@@ -111,7 +112,8 @@ Cookie 屬性:`HttpOnly`(網頁 JS 讀不到)、`SameSite=Strict`、`Path=/`、`
 | 功能 | 指令 |
 |---|---|
 | 機器清單 | `prlctl list -a -f --json` |
-| IP 與網卡 | `prlctl list -i <id> --json`(`Network.ipAddresses`、`Hardware.netN`) |
+| IP、網卡與規格 | `prlctl list -i <id> --json`(`Network.ipAddresses`、`Hardware.netN`、`Hardware.cpu.cpus`、`Hardware.memory.size`) |
+| 修改規格 | `prlctl set <id> --cpus N --memsize MB` |
 | 電源 | `prlctl start / stop / stop --kill / suspend / resume / pause / restart` |
 | 快照 | `prlctl snapshot / snapshot-list --json / snapshot-switch / snapshot-delete` |
 | 網卡 | `prlctl set <id> --device-connect|--device-disconnect netN` |
@@ -122,6 +124,8 @@ Cookie 屬性:`HttpOnly`(網頁 JS 讀不到)、`SameSite=Strict`、`Path=/`、`
 | 刪除 | `prlctl stop --kill`(若在執行)→ `prlctl delete` |
 
 ### 重要行為
+
+- **規格(CPU / 記憶體)**:`listVMs` 對所有狀態的機器都查 `list -i`,把 `cpus` 與 `memMB` 放進 `hw`(IP 與網卡仍只處理執行中的機器)。`setSpec` 驗證 CPU 介於 1 到主機核心數、記憶體介於 256MB 到主機實體記憶體,並要求機器為 `stopped`(Parallels 不允許修改執行中 / 休眠機器的硬體),否則回 `409`。
 
 - **IP 與網卡類型**:`ip_configured` 只回報第一個 IP,所以對執行中的機器另查 `list -i` 取得全部 IPv4。Parallels 不提供「IP 屬於哪張網卡」,改依 IP 所在網段判斷:落在 Shared / Host-Only 虛擬網路網段的標示為對應類型,其餘標示為 Bridged。某類網卡全部被拔掉時,殘留的舊 IP 會被過濾掉。
 - **轉發規則清單**:`net info --json` 裡未命名的規則 key 都是空字串且會重複,無法正確解析,所以規則本身以文字輸出解析,JSON 只用來對照名稱。沒有名稱的既有規則在網頁上為唯讀。
@@ -167,8 +171,9 @@ iOS 加到主畫面時使用 `apple-touch-icon`(滿版 180x180),而且圖示是�
 
 整個前端是一個字串常數,由 `GET /` 回傳。外觀參考 DragonVM 的冷灰 + 琥珀金配色,為節省手機 GPU 不使用 `backdrop-filter`、光暈陰影與動畫。字型使用系統字型並以非阻塞方式載入 Google Fonts 的 Inter(外網不通時頁面也不會卡住)。
 
-- **版面**:每台機器一張卡片,預設只顯示狀態圓點與名稱;展開後依序為狀態與 IP、電源按鈕列、網卡、端口轉發、快照。電源按鈕列使用圖示。
-- **差異更新**:每張卡片拆成 `head / ips / actions / nics / fw` 區塊,各自計算內容特徵(`partSigs`);刷新時只替換特徵有變的區塊,沒變的 DOM 節點完全不動,因此展開狀態、輸入到一半的欄位、捲動位置都會保留。卡片以 UUID 為鍵,新增 / 移除 / 排序只動有差異的節點。快照清單在展開時靜默重抓,內容沒變就不替換。
+- **版面**:每台機器一張卡片,預設只顯示狀態圓點與名稱;展開後依序為狀態與 IP、電源按鈕列、規格、網卡、端口轉發、快照。電源按鈕列使用圖示。
+- **規格區塊**(`partSpec`):顯示「N 核心 · X GB 記憶體」,並提供 CPU(1 到主機核心數,步進 1)與記憶體(512MB 到主機記憶體,步進 256MB)兩條滑桿,樣式參考 DragonGuardian 的 `.form-slider`(金色填充、橢圓玻璃把手)。只有已關機的機器能拖動並按「套用」,其餘狀態滑桿停用並提示需先關機;數值沒變時「套用」停用。
+- **差異更新**:每張卡片拆成 `head / ips / actions / spec / nics / fw` 區塊,各自計算內容特徵(`partSigs`);刷新時只替換特徵有變的區塊,沒變的 DOM 節點完全不動,因此展開狀態、輸入到一半的欄位、捲動位置都會保留。卡片以 UUID 為鍵,新增 / 移除 / 排序只動有差異的節點。快照清單在展開時靜默重抓,內容沒變就不替換。
 - **刷新時機**:頁面載入、操作完成後,以及點擊畫面任何位置(0.4 秒內連點只刷新一次)。同時只跑一個刷新,刷新途中又被要求時在結束後補跑一次。
 - **對話框**:`dgDialog` 取代瀏覽器原生 `alert / confirm / prompt`,按鈕為全寬堆疊;`dgConfirm`、`dgPrompt` 為其包裝。取消操作以 `CANCEL` 物件表示,按鈕處理函式會靜默結束而不顯示錯誤。
 - **登入**:任何 API 回 `401` 時自動跳出密碼對話框,成功後重試原請求。登入是必要步驟,所以對話框是 `modal`:沒有取消鈕,點旁邊空白處也不會關閉。已設定密碼時右上角出現人頭圖示,點開確認後登出,登出完成會 `location.reload()` 重新載入頁面,清掉殘留的機器清單與狀態。

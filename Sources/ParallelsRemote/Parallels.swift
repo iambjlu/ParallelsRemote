@@ -42,11 +42,12 @@ actor Parallels {
 
         // ip_configured 只會回報第一個 IP;多張網卡要從 `list -i` 取得全部 IPv4 與網卡清單,
         // 再依所屬的虛擬網路網段標示 IP 是 Shared、Host-Only 還是 Bridged。
-        let running = vms.enumerated().filter { ($0.element["status"] as? String) == "running" }
-        if !running.isEmpty {
+        // 同一次查詢也取得 CPU / 記憶體規格,所以所有狀態的機器都要查。
+        let all = Array(vms.enumerated())
+        if !all.isEmpty {
             let subnets = await networkSubnets()
             let infos = await withTaskGroup(of: (Int, GuestInfo).self) { group -> [Int: GuestInfo] in
-                for (i, v) in running {
+                for (i, v) in all {
                     guard let id = v["uuid"] as? String else { continue }
                     group.addTask { (i, await Self.guestInfo(id: id)) }
                 }
@@ -55,6 +56,8 @@ actor Parallels {
                 return r
             }
             for (i, info) in infos {
+                if info.cpus > 0 { vms[i]["hw"] = ["cpus": info.cpus, "memMB": info.memMB] }
+                guard (vms[i]["status"] as? String) == "running" else { continue }
                 // 某種網路的網卡全部被拔掉時,Parallels 仍會殘留舊 IP,這裡把它濾掉
                 let kinds = Set(info.nics.map { Self.kind($0.type) })
                 let dead = kinds.filter { k in info.nics.filter { Self.kind($0.type) == k }.allSatisfy { !$0.connected } }
@@ -96,7 +99,7 @@ actor Parallels {
     }
 
     private struct NICInfo: Sendable { let name: String; let type: String; let mac: String; let connected: Bool }
-    private struct GuestInfo: Sendable { var ips: [String] = []; var nics: [NICInfo] = [] }
+    private struct GuestInfo: Sendable { var ips: [String] = []; var nics: [NICInfo] = []; var cpus = 0; var memMB = 0 }
 
     private static func kind(_ type: String) -> String {
         switch type {
@@ -115,6 +118,10 @@ actor Parallels {
             info.ips = addrs.compactMap { ($0["type"] as? String) == "ipv4" ? $0["ip"] as? String : nil }
         }
         if let hw = first["Hardware"] as? [String: Any] {
+            info.cpus = (hw["cpu"] as? [String: Any])?["cpus"] as? Int ?? 0
+            // size 形如 "4096Mb"
+            let size = ((hw["memory"] as? [String: Any])?["size"] as? String ?? "").lowercased()
+            info.memMB = Int(size.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)) ?? 0
             let names = hw.keys.filter { $0.range(of: #"^net\d+$"#, options: .regularExpression) != nil }
                 .sorted { (Int($0.dropFirst(3)) ?? 0) < (Int($1.dropFirst(3)) ?? 0) }
             for n in names {
@@ -149,6 +156,20 @@ actor Parallels {
         default: throw APIError(status: 400, message: "不支援的動作")
         }
         try await Shell.check(prlctl, args)
+    }
+
+    // MARK: 規格(CPU / 記憶體)
+
+    static var hostCPUs: Int { ProcessInfo.processInfo.processorCount }
+    static var hostMemMB: Int { Int(ProcessInfo.processInfo.physicalMemory / 1_048_576) }
+
+    /// Parallels 只允許修改已關機的機器;記憶體以 MB 為單位。
+    func setSpec(id: String, cpus: Int, memMB: Int) async throws {
+        let id = try requireID(id)
+        guard (1...Self.hostCPUs).contains(cpus) else { throw APIError(status: 400, message: "CPU 數量須介於 1 到 \(Self.hostCPUs)") }
+        guard (256...Self.hostMemMB).contains(memMB) else { throw APIError(status: 400, message: "記憶體須介於 256 到 \(Self.hostMemMB) MB") }
+        guard (try await vm(id)["status"] as? String) == "stopped" else { throw APIError(status: 409, message: "請先關機才能修改規格") }
+        try await Shell.check(prlctl, ["set", id, "--cpus", String(cpus), "--memsize", String(memMB)])
     }
 
     // MARK: 快照
