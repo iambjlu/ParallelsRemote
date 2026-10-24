@@ -533,7 +533,7 @@ function partSpec(v) {
     while (n1 % gap !== 0 && gap < n1) gap++;
     if (gap === n1 && n1 > 6) gap = Math.ceil(n1 / 6);   // 沒有適合的整除間隔:退而求其次,最後一個一定標數字
     vals.forEach((t, i) => {
-      const labeled = i % gap === 0 || i === n1;
+      const labeled = i === n1 || (i % gap === 0 && n1 - i >= gap / 2);   // 倒數第二個標籤太貼近上限就略過
       ticks.append(el('span', { textContent: labeled ? String(+(t / unit).toFixed(2)) : '', style: 'left:' + tickLeft((t - min) / (max - min)) }));
     });
     return { sl, node: el('div', { className: 'spec-row' }, el('div', { className: 'spec-label' }, el('span', { textContent: label }), out), wrap, ticks) };
