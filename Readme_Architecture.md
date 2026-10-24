@@ -159,7 +159,9 @@ Cookie 屬性:`HttpOnly`(網頁 JS 讀不到)、`SameSite=Strict`、`Path=/`、`
 
 ## PWA.swift
 
-提供 `/manifest.webmanifest`(`display: standalone`)、`/sw.js`(不快取任何內容的最精簡 service worker,只為了讓瀏覽器視為可安裝)與三個圖示:`/icon-192.png`、`/icon-512.png`、`/icon-maskable-512.png`。這些資源不含機敏資料,不需要登入,由 `Router.pwaAsset` 在登入檢查之前直接回傳。圖示是程式產生的 PNG(深灰底、金色三層伺服器機架),以 base64 內嵌。service worker 只在 secure context 註冊,失敗不影響一般使用。
+提供 `/manifest.webmanifest`(`display: standalone`)、`/sw.js`(不快取任何內容的最精簡 service worker,只為了讓瀏覽器視為可安裝)與三個圖示:`/icon-192.png`、`/icon-512.png`、`/icon-maskable-512.png`。這些資源不含機敏資料,不需要登入,由 `Router.pwaAsset` 在登入檢查之前直接回傳。
+
+iOS 加到主畫面時使用 `apple-touch-icon`(滿版 180x180),而且圖示是由系統另外下載;自簽憑證下那個下載會失敗,圖示就不會出現。因此這張圖以 `data:` 網址直接內嵌在 HTML 的 `<link rel="apple-touch-icon">`(`PWA.appleTouchIconBase64`),不需要另外下載。已經加到主畫面的捷徑不會自動更新圖示,需要刪掉重加。圖示是程式產生的 PNG(深灰底、金色三層伺服器機架),以 base64 內嵌。service worker 只在 secure context 註冊,失敗不影響一般使用。
 
 ## Web.swift(單頁網頁)
 
@@ -171,8 +173,8 @@ Cookie 屬性:`HttpOnly`(網頁 JS 讀不到)、`SameSite=Strict`、`Path=/`、`
 - **對話框**:`dgDialog` 取代瀏覽器原生 `alert / confirm / prompt`,按鈕為全寬堆疊;`dgConfirm`、`dgPrompt` 為其包裝。取消操作以 `CANCEL` 物件表示,按鈕處理函式會靜默結束而不顯示錯誤。
 - **登入**:任何 API 回 `401` 時自動跳出密碼對話框,成功後重試原請求。登入是必要步驟,所以對話框是 `modal`:沒有取消鈕,點旁邊空白處也不會關閉。已設定密碼時右上角出現人頭圖示,點開確認後登出,登出完成會 `location.reload()` 重新載入頁面,清掉殘留的機器清單與狀態。
 - **拷貝**:區網 `http://` 不是 secure context,`navigator.clipboard` 不可用,所以使用 `textarea` + `execCommand('copy')` 後備;失敗時會明確顯示失敗,不假裝成功。
-- **iOS 獨立視窗的標題列保底**:加到主畫面後 `env(safe-area-inset-top)` 可能回報 0,標題列會被動態島 / 狀態列蓋住。因此在 `display-mode: standalone` 且為 iOS(以只有 iOS WebKit 支援的 `-webkit-touch-callout` 辨識)時,標題列頂部間距取 `max(env(safe-area-inset-top), 56px) + 8px`。
-- **標題列**:`position: sticky`,`z-index: 50`(低於對話框的 100,高於所有卡片),並以 `translateZ(0)` / `will-change: transform` 獨立成合成圖層,避免 iOS WebKit 快速捲動時 sticky 元素不重繪而看起來消失。
+- **iOS 獨立視窗的標題列保底**:加到主畫面後 `env(safe-area-inset-top)` 不一定可靠,標題列會被動態島 / 狀態列蓋住。頁面載入時若 `navigator.standalone === true` 且螢幕長邊為動態島機型的高度(852 / 874 / 932 / 956),就設定 CSS 變數 `--sat: 62px`;標題列頂部間距為 `max(env(safe-area-inset-top), var(--sat, 0px)) + 16px`,所以兩者取較大者。
+- **標題列**:`position: sticky`,`z-index: 50`(低於對話框的 100,高於所有卡片)。不使用 `will-change` / `translateZ`:這會讓 iOS 以低解析度點陣化該圖層,文字會變糊。
 - **PWA 與安全區域**:`viewport-fit=cover` 搭配 iOS 的 `black-translucent` 狀態列時,內容會延伸到狀態列 / 動態島底下,所以標題列、主要內容與提示訊息都用 `env(safe-area-inset-*)` 留出安全區域。
 - **禁止雙擊放大與選取文字**:`touch-action: manipulation`、`user-select: none`(輸入框例外)。
 

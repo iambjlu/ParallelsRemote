@@ -9,7 +9,7 @@ let webPage = #"""
 <meta name="theme-color" content="#2E2F31">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" href="/icon-192.png">
-<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="data:image/png;base64,\#(PWA.appleTouchIconBase64)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Parallels">
@@ -40,25 +40,14 @@ body {
 }
 header {
   position: sticky; top: 0; z-index: 50;
-  /* iOS WebKit 快速捲動時,sticky 元素偶爾不重繪(看起來像消失)。
-     讓標題列獨立成一個合成圖層可以避免;只有一小塊,不影響效能。 */
-  -webkit-transform: translateZ(0); transform: translateZ(0); will-change: transform; display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 10px;
   /* PWA 全螢幕時內容會延伸到狀態列 / 動態島底下,標題列要自己留出安全區域 */
-  padding: calc(22px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left));
+  padding: calc(max(env(safe-area-inset-top), var(--sat, 0px)) + 16px) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left));
   background: var(--surface); border-bottom: 1px solid var(--border);
 }
 header { gap: 8px; }
 header h1 { flex: 1; font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
 main { max-width: 720px; margin: 0 auto; padding: 14px max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)); display: flex; flex-direction: column; gap: 14px; }
-
-/* iOS 加到主畫面(獨立視窗)時,env(safe-area-inset-top) 可能回報 0,
-   標題列會被動態島 / 狀態列蓋住,所以在 iOS 獨立視窗模式下設一個保底的最小高度。
-   -webkit-touch-callout 只有 iOS 的 WebKit 支援,用來辨識 iOS。 */
-@media (display-mode: standalone) {
-  @supports (-webkit-touch-callout: none) {
-    header { padding-top: calc(max(env(safe-area-inset-top), 56px) + 8px); }
-  }
-}
 
 /* 按鈕 */
 button, select, input { font-family: inherit; }
@@ -181,6 +170,11 @@ select:focus, input:focus { border-color: var(--accent); }
 <div id="msg"></div>
 <script>
 const $ = id => document.getElementById(id);
+// iOS 加到主畫面後 env(safe-area-inset-top) 不一定可靠,標題列會被動態島 / 狀態列蓋住。
+// 動態島機型(螢幕高 852 / 874 / 932 / 956 pt)的狀態列約 59~62pt,直接給保底值。
+if (navigator.standalone === true && [852, 874, 932, 956].includes(Math.max(screen.width, screen.height))) {
+  document.documentElement.style.setProperty('--sat', '62px');
+}
 const STATUS = { stopped: '已關機', running: '執行中', suspended: '已休眠', paused: '已暫停' };
 const openSnaps = new Set();
 const openVMs = new Set();
